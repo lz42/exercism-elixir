@@ -18,9 +18,21 @@ defmodule PalindromeProducts do
     |> palindromate
     |> roll_to_first_palindrome(min_prod)
     |> split_to_digits
-    |> gen_palindromes(max_prod |> Integer.digits(), [])
-    |> List.first
-    |> products({max_factor, min_factor})
+    |> get_palindromes_inc_stream(max_prod |> Integer.digits())
+    |> Enum.find(fn palindrome ->
+      IO.inspect(palindrome, label: "find palindrome")
+      case products(palindrome, {max_factor, min_factor}) do
+        [] ->
+          IO.puts("[] -> false")
+          false
+        product_list -> IO.inspect(product_list, label: "product_list")
+      end
+    end)
+    |> dbg
+    # |> gen_palindromes(max_prod |> Integer.digits(), [])
+    # |> List.first
+    # |> products({max_factor, min_factor})
+
     # |> Enum.map(&Tuple.to_list/1)
     # palindrome = map |> List.first() |> Enum.product
     # %{palindrome => map}
@@ -42,7 +54,7 @@ defmodule PalindromeProducts do
   defp palindromate({left_side, center, _right_side}),
     do: {left_side, center, left_side |> Enum.reverse()}
 
-  defp split_to_integer(split), do: split |> split_to_digits |> Integer.undigits()
+  def split_to_integer(split), do: split |> split_to_digits |> Integer.undigits()
   defp split_to_digits(split), do: split |> Tuple.to_list() |> List.flatten()
 
   def inc({left_side, center, right_side}) do
@@ -56,13 +68,31 @@ defmodule PalindromeProducts do
     |> palindromate
   end
 
-  defp gen_palindromes(digits, max, acc) when length(digits) > length(max), do: acc
+  def dec({left_side, center, right_side}) do
+    {val, _borrow} =
+      List.foldr(left_side ++ center, {[], 1}, fn elem, {list, borrow} ->
+        if elem >= borrow do
+          {[elem - borrow | list], 0}
+        else
+          {[10 + elem - borrow | list], 1}
+        end
+      end)
+    nval = val ++ List.duplicate(9, length right_side)
+    if(hd(nval) == 0, do: tl(nval), else: nval)
+    |> split_digits
+    |> palindromate
+  end
 
-  defp gen_palindromes(digits, max, acc) when length(digits) == length(max) and digits > max,
-    do: acc
+  def get_palindromes_inc_stream(first_palindrome_digits, max), do:
+    Stream.unfold(first_palindrome_digits, &
+      case inc_palindrome(&1, max) do
+        nil -> nil
+        new_palindrome -> {&1, new_palindrome}
+      end)
 
-  defp gen_palindromes(digits, max, acc),
-    do: digits |> split_digits |> inc |> split_to_digits |> gen_palindromes(max, acc ++ [digits])
+  def inc_palindrome(digits, max) when length(digits) > length(max), do: nil
+  def inc_palindrome(digits, max) when length(digits) == length(max) and digits > max, do: nil
+  def inc_palindrome(digits, _max), do: digits |> split_digits |> inc |> split_to_digits
 
   def products(digits, {max_factor, min_factor}) do
     palindrome = digits |> Integer.undigits()
